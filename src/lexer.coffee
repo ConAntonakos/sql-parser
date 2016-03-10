@@ -8,29 +8,29 @@ class Lexer
     while @chunk = sql.slice(i)
       bytesConsumed =  
                       @commentToken() or
-                       @columnNameToken() or
+                      @columnNameToken() or
                       @keywordToken() or
-                       @starToken() or
-                       @semicolonToken() or
-                       @booleanToken() or
-                       @functionToken() or
-                       @windowExtension() or
-                       @sortOrderToken() or
-                       @separatorToken() or
-                       @operatorToken() or
-                       @mathToken() or
-                       @dotToken() or
-                       @conditionalToken() or
-                       @betweenToken() or
-                       @subSelectOpToken() or
-                       @subSelectUnaryOpToken() or
-                       @numberToken() or
-                       @stringToken() or
-                       @parameterToken() or
-                       @parensToken() or
-                       @whitespaceToken() or
-                       @tableNameToken() or
-                       @literalToken()
+                      @starToken() or
+                      @semicolonToken() or
+                      @booleanToken() or
+                      @functionToken() or
+                      @windowExtension() or
+                      @sortOrderToken() or
+                      @separatorToken() or
+                      @operatorToken() or
+                      @mathToken() or
+                      @dotToken() or
+                      @conditionalToken() or
+                      @betweenToken() or
+                      @subSelectOpToken() or
+                      @subSelectUnaryOpToken() or
+                      @numberToken() or
+                      @stringToken() or
+                      @parameterToken() or
+                      @parensToken() or
+                      @whitespaceToken() or
+                      @tableNameToken() or
+                      @literalToken()
       throw new Error("NOTHING CONSUMED: Stopped at - '#{@chunk.slice(0,30)}'") if bytesConsumed < 1
       i += bytesConsumed
     @token('EOF', '')
