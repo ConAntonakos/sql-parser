@@ -6,13 +6,17 @@ class Lexer
     @currentLine = 1
     i = 0
     while @chunk = sql.slice(i)
-      bytesConsumed =  @keywordToken() or
+      bytesConsumed =  
+                      @commentToken() or
+                       @columnNameToken() or
+                      @keywordToken() or
                        @starToken() or
+                       @semicolonToken() or
                        @booleanToken() or
                        @functionToken() or
                        @windowExtension() or
                        @sortOrderToken() or
-                       @seperatorToken() or
+                       @separatorToken() or
                        @operatorToken() or
                        @mathToken() or
                        @dotToken() or
@@ -25,6 +29,7 @@ class Lexer
                        @parameterToken() or
                        @parensToken() or
                        @whitespaceToken() or
+                       @tableNameToken() or
                        @literalToken()
       throw new Error("NOTHING CONSUMED: Stopped at - '#{@chunk.slice(0,30)}'") if bytesConsumed < 1
       i += bytesConsumed
@@ -66,6 +71,7 @@ class Lexer
     ret
 
   keywordToken: ->
+    @tokenizeFromWord('CREATE TABLE') or
     @tokenizeFromWord('SELECT') or
     @tokenizeFromWord('DISTINCT') or
     @tokenizeFromWord('FROM') or
@@ -107,13 +113,19 @@ class Lexer
   booleanToken:     -> @tokenizeFromList('BOOLEAN', BOOLEAN)
 
   starToken:        -> @tokenizeFromRegex('STAR', STAR)
-  seperatorToken:   -> @tokenizeFromRegex('SEPARATOR', SEPARATOR)
+  separatorToken:   -> @tokenizeFromRegex('SEPARATOR', SEPARATOR)
+  semicolonToken:   -> @tokenizeFromRegex('SEMICOLON', SEMICOLON)
   literalToken:     -> @tokenizeFromRegex('LITERAL', LITERAL, 1, 0)
   numberToken:      -> @tokenizeFromRegex('NUMBER', NUMBER)
   parameterToken:   -> @tokenizeFromRegex('PARAMETER', PARAMETER)
   stringToken:      ->
     @tokenizeFromRegex('STRING', STRING, 1, 0) ||
     @tokenizeFromRegex('DBLSTRING', DBLSTRING, 1, 0)
+  
+  ignore = false
+  commentToken: -> @ignoreOrTokenize(ignore, 'COMMENT', COMMENT)
+  tableNameToken: -> @tokenizeFromRegex('TABLE_NAME', TABLE_NAME)
+  columnNameToken: -> @ignoreOrTokenize(!ignore, 'COLUMN_NAME', COLUMN_NAME)
 
 
   parensToken: ->
@@ -135,6 +147,14 @@ class Lexer
     @token(name, partMatch) if @preserveWhitespace
     return partMatch.length
 
+  ignoreOrTokenize: (recordToken, tokenName, regex) ->
+    return 0 unless match = regex.exec(@chunk)
+    partMatch = match[0]
+    newlines = partMatch.replace(/[^\n]/, '').length
+    @currentLine += newlines
+    @token(tokenName, partMatch) if recordToken
+    return partMatch.length
+
   regexEscape: (str) ->
     str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")
 
@@ -148,6 +168,7 @@ class Lexer
   BOOLEAN             = ['TRUE', 'FALSE', 'NULL']
   MATH                = ['+', '-']
   MATH_MULTI          = ['/', '*']
+  SEMICOLON           = /^;/
   STAR                = /^\*/
   SEPARATOR           = /^,/
   WHITESPACE          = /^[ \n\r]+/
@@ -156,8 +177,11 @@ class Lexer
   NUMBER              = /^[0-9]+(\.[0-9]+)?/
   STRING              = /^'([^\\']*(?:\\.[^\\']*)*)'/
   DBLSTRING           = /^"([^\\"]*(?:\\.[^\\"]*)*)"/
+  COMMENT             = /^--.+\n|^@.+|^SET.+|^ENGINE.+|^PRIMARY KEY.+|^INDEX.+/
+  TABLE_NAME          = /^IF NOT EXISTS `(.+)`/
+  COLUMN_NAME         = /^`((?!id|created_at|updated_at).+)\sNULL/
+
 
 
 
 exports.tokenize = (sql, opts) -> (new Lexer(sql, opts)).tokens
-
