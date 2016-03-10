@@ -7,30 +7,31 @@ class Lexer
     i = 0
     while @chunk = sql.slice(i)
       bytesConsumed =  
-                      @commentToken()
-                      or @columnNameToken()
-                      or @keywordToken()
-                      or @starToken()
-                      or @semicolonToken()
-                      or @booleanToken()
-                      or @functionToken()
-                      or @windowExtension()
-                      or @sortOrderToken()
-                      or @separatorToken()
-                      or @operatorToken()
-                      or @mathToken()
-                      or @dotToken()
-                      or @conditionalToken()
-                      or @betweenToken()
-                      or @subSelectOpToken()
-                      or @subSelectUnaryOpToken()
-                      or @numberToken()
-                      or @stringToken()
-                      or @parameterToken()
-                      or @parensToken()
-                      or @whitespaceToken()
-                      or @tableNameToken()
-                      or @literalToken()
+                    @commentToken() or
+                    @columnNameToken() or
+                    @keywordToken() or
+                    @starToken() or
+                    @semicolonToken() or
+                    @booleanToken() or
+                    @functionToken() or
+                    @windowExtension() or
+                    @sortOrderToken() or
+                    @separatorToken() or
+                    @operatorToken() or
+                    @mathToken() or
+                    @dotToken() or
+                    @conditionalToken() or
+                    @betweenToken() or
+                    @subSelectOpToken() or
+                    @subSelectUnaryOpToken() or
+                    @numberToken() or
+                    @stringToken() or
+                    @parameterToken() or
+                    @parensToken() or
+                    @whitespaceToken() or
+                    @tableNameToken() or
+                    @literalToken()
+
       throw new Error("NOTHING CONSUMED: Stopped at - '#{@chunk.slice(0,30)}'") if bytesConsumed < 1
       i += bytesConsumed
     @token('EOF', '')
@@ -122,10 +123,11 @@ class Lexer
     @tokenizeFromRegex('STRING', STRING, 1, 0) ||
     @tokenizeFromRegex('DBLSTRING', DBLSTRING, 1, 0)
   
-  ignore = false
-  commentToken: -> @ignoreOrTokenize(ignore, 'COMMENT', COMMENT)
+  shouldBeTokenized = true
+  commentToken: -> @tokenizeOrIgnore('COMMENT', COMMENT)
+  whitespaceToken: -> @tokenizeOrIgnore('WHITESPACE', WHITESPACE, @preserveWhitespace)
   tableNameToken: -> @tokenizeFromRegex('TABLE_NAME', TABLE_NAME)
-  columnNameToken: -> @ignoreOrTokenize(!ignore, 'COLUMN_NAME', COLUMN_NAME)
+  columnNameToken: -> @tokenizeOrIgnore('COLUMN_NAME', COLUMN_NAME, shouldBeTokenized)
 
 
   parensToken: ->
@@ -139,20 +141,13 @@ class Lexer
     @token('WINDOW_FUNCTION', match[2])
     match[0].length
 
-  whitespaceToken: ->
-    return 0 unless match = WHITESPACE.exec(@chunk)
-    partMatch = match[0]
-    newlines = partMatch.replace(/[^\n]/, '').length
-    @currentLine += newlines
-    @token(name, partMatch) if @preserveWhitespace
-    return partMatch.length
-
-  ignoreOrTokenize: (recordToken, tokenName, regex) ->
+  tokenizeOrIgnore: (tokenName, regex, shouldBeTokenized=false) ->
+    # if typeof shouldBeTokenized === 'undefined' shouldBeTokenized =
     return 0 unless match = regex.exec(@chunk)
     partMatch = match[0]
     newlines = partMatch.replace(/[^\n]/, '').length
     @currentLine += newlines
-    @token(tokenName, partMatch) if recordToken
+    @token(tokenName, partMatch) if shouldBeTokenized
     return partMatch.length
 
   regexEscape: (str) ->
