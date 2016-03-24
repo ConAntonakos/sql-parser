@@ -8,7 +8,7 @@
   var Lexer;
 
   Lexer = (function() {
-    var BOOLEAN, DBLSTRING, LITERAL, MATH, MATH_MULTI, NUMBER, PARAMETER, SEPARATOR, SQL_BETWEENS, SQL_CONDITIONALS, SQL_FUNCTIONS, SQL_OPERATORS, SQL_SORT_ORDERS, STAR, STRING, SUB_SELECT_OP, SUB_SELECT_UNARY_OP, WHITESPACE;
+    var BOOLEAN, COLUMN_NAME, COMMENT, DBLSTRING, LITERAL, MATH, MATH_MULTI, NUMBER, PARAMETER, SEMICOLON, SEPARATOR, SQL_BETWEENS, SQL_CONDITIONALS, SQL_FUNCTIONS, SQL_OPERATORS, SQL_SORT_ORDERS, STAR, STRING, SUB_SELECT_OP, SUB_SELECT_UNARY_OP, TABLE_NAME, WHITESPACE, shouldBeTokenized;
 
     function Lexer(sql, opts) {
       var bytesConsumed, i;
@@ -21,7 +21,7 @@
       this.currentLine = 1;
       i = 0;
       while (this.chunk = sql.slice(i)) {
-        bytesConsumed = this.keywordToken() || this.starToken() || this.booleanToken() || this.functionToken() || this.windowExtension() || this.sortOrderToken() || this.seperatorToken() || this.operatorToken() || this.mathToken() || this.dotToken() || this.conditionalToken() || this.betweenToken() || this.subSelectOpToken() || this.subSelectUnaryOpToken() || this.numberToken() || this.stringToken() || this.parameterToken() || this.parensToken() || this.whitespaceToken() || this.literalToken();
+        bytesConsumed = this.commentToken() || this.columnNameToken() || this.keywordToken() || this.starToken() || this.semicolonToken() || this.booleanToken() || this.functionToken() || this.windowExtension() || this.sortOrderToken() || this.separatorToken() || this.operatorToken() || this.mathToken() || this.dotToken() || this.conditionalToken() || this.betweenToken() || this.subSelectOpToken() || this.subSelectUnaryOpToken() || this.numberToken() || this.stringToken() || this.parameterToken() || this.parensToken() || this.whitespaceToken() || this.tableNameToken() || this.literalToken();
         if (bytesConsumed < 1) {
           throw new Error("NOTHING CONSUMED: Stopped at - '" + (this.chunk.slice(0, 30)) + "'");
         }
@@ -105,7 +105,7 @@
     };
 
     Lexer.prototype.keywordToken = function() {
-      return this.tokenizeFromWord('SELECT') || this.tokenizeFromWord('DISTINCT') || this.tokenizeFromWord('FROM') || this.tokenizeFromWord('WHERE') || this.tokenizeFromWord('GROUP') || this.tokenizeFromWord('ORDER') || this.tokenizeFromWord('BY') || this.tokenizeFromWord('HAVING') || this.tokenizeFromWord('LIMIT') || this.tokenizeFromWord('JOIN') || this.tokenizeFromWord('LEFT') || this.tokenizeFromWord('RIGHT') || this.tokenizeFromWord('INNER') || this.tokenizeFromWord('OUTER') || this.tokenizeFromWord('ON') || this.tokenizeFromWord('AS') || this.tokenizeFromWord('UNION') || this.tokenizeFromWord('ALL') || this.tokenizeFromWord('LIMIT') || this.tokenizeFromWord('OFFSET') || this.tokenizeFromWord('FETCH') || this.tokenizeFromWord('ROW') || this.tokenizeFromWord('ROWS') || this.tokenizeFromWord('ONLY') || this.tokenizeFromWord('NEXT') || this.tokenizeFromWord('FIRST');
+      return this.tokenizeFromWord('CREATE TABLE') || this.tokenizeFromWord('SELECT') || this.tokenizeFromWord('DISTINCT') || this.tokenizeFromWord('FROM') || this.tokenizeFromWord('WHERE') || this.tokenizeFromWord('GROUP') || this.tokenizeFromWord('ORDER') || this.tokenizeFromWord('BY') || this.tokenizeFromWord('HAVING') || this.tokenizeFromWord('LIMIT') || this.tokenizeFromWord('JOIN') || this.tokenizeFromWord('LEFT') || this.tokenizeFromWord('RIGHT') || this.tokenizeFromWord('INNER') || this.tokenizeFromWord('OUTER') || this.tokenizeFromWord('ON') || this.tokenizeFromWord('AS') || this.tokenizeFromWord('UNION') || this.tokenizeFromWord('ALL') || this.tokenizeFromWord('LIMIT') || this.tokenizeFromWord('OFFSET') || this.tokenizeFromWord('FETCH') || this.tokenizeFromWord('ROW') || this.tokenizeFromWord('ROWS') || this.tokenizeFromWord('ONLY') || this.tokenizeFromWord('NEXT') || this.tokenizeFromWord('FIRST');
     };
 
     Lexer.prototype.dotToken = function() {
@@ -152,8 +152,12 @@
       return this.tokenizeFromRegex('STAR', STAR);
     };
 
-    Lexer.prototype.seperatorToken = function() {
+    Lexer.prototype.separatorToken = function() {
       return this.tokenizeFromRegex('SEPARATOR', SEPARATOR);
+    };
+
+    Lexer.prototype.semicolonToken = function() {
+      return this.tokenizeFromRegex('SEMICOLON', SEMICOLON);
     };
 
     Lexer.prototype.literalToken = function() {
@@ -172,6 +176,24 @@
       return this.tokenizeFromRegex('STRING', STRING, 1, 0) || this.tokenizeFromRegex('DBLSTRING', DBLSTRING, 1, 0);
     };
 
+    shouldBeTokenized = true;
+
+    Lexer.prototype.commentToken = function() {
+      return this.tokenizeOrIgnore('COMMENT', COMMENT);
+    };
+
+    Lexer.prototype.whitespaceToken = function() {
+      return this.tokenizeOrIgnore('WHITESPACE', WHITESPACE, this.preserveWhitespace);
+    };
+
+    Lexer.prototype.tableNameToken = function() {
+      return this.tokenizeFromRegex('TABLE_NAME', TABLE_NAME);
+    };
+
+    Lexer.prototype.columnNameToken = function() {
+      return this.tokenizeOrIgnore('COLUMN_NAME', COLUMN_NAME, shouldBeTokenized);
+    };
+
     Lexer.prototype.parensToken = function() {
       return this.tokenizeFromRegex('LEFT_PAREN', /^\(/) || this.tokenizeFromRegex('RIGHT_PAREN', /^\)/);
     };
@@ -187,16 +209,19 @@
       return match[0].length;
     };
 
-    Lexer.prototype.whitespaceToken = function() {
+    Lexer.prototype.tokenizeOrIgnore = function(tokenName, regex, shouldBeTokenized) {
       var match, newlines, partMatch;
-      if (!(match = WHITESPACE.exec(this.chunk))) {
+      if (shouldBeTokenized == null) {
+        shouldBeTokenized = false;
+      }
+      if (!(match = regex.exec(this.chunk))) {
         return 0;
       }
       partMatch = match[0];
       newlines = partMatch.replace(/[^\n]/, '').length;
       this.currentLine += newlines;
-      if (this.preserveWhitespace) {
-        this.token(name, partMatch);
+      if (shouldBeTokenized) {
+        this.token(tokenName, partMatch);
       }
       return partMatch.length;
     };
@@ -225,6 +250,8 @@
 
     MATH_MULTI = ['/', '*'];
 
+    SEMICOLON = /^;/;
+
     STAR = /^\*/;
 
     SEPARATOR = /^,/;
@@ -240,6 +267,12 @@
     STRING = /^'([^\\']*(?:\\.[^\\']*)*)'/;
 
     DBLSTRING = /^"([^\\"]*(?:\\.[^\\"]*)*)"/;
+
+    COMMENT = /^--.+\n|^@.+|^SET.+|^ENGINE.+|^PRIMARY KEY.+|^INDEX.+/;
+
+    TABLE_NAME = /^IF NOT EXISTS `(.+)`/;
+
+    COLUMN_NAME = /^`((?!id|created_at|updated_at).+)\sNULL/;
 
     return Lexer;
 
